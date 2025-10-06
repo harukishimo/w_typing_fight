@@ -17,6 +17,8 @@ export default {
         return new Response('Missing roomId', { status: 400 });
       }
 
+      console.log('[Worker] env keys', Object.keys(env ?? {}));
+
       const roomNamespace = env.ROOM ?? env['w-typing-fight-workers_RoomDO'];
       if (!roomNamespace) {
         console.error('[Worker] ROOM Durable Object binding is missing');

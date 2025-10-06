@@ -18,6 +18,8 @@ export default {
         return new Response('Missing roomId', { status: 400 });
       }
 
+      console.log('[Pages Function] env keys', Object.keys(env ?? {}));
+
       const roomNamespace = env.ROOM ?? env['w-typing-fight-workers_RoomDO'];
       if (!roomNamespace) {
         console.error('[Pages Function] ROOM Durable Object binding is missing');
