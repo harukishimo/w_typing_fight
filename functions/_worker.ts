@@ -3,7 +3,7 @@
  * WebSocket処理をPages内で実行
  */
 
-import { RoomDO } from '../../workers/src/room-do';
+import { RoomDO } from '../workers/src/room-do';
 
 export { RoomDO };
 
