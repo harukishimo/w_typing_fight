@@ -85,6 +85,14 @@ export interface GameStartMessage {
 }
 
 /**
+ * カウントダウン通知
+ */
+export interface CountdownMessage {
+  type: 'countdown';
+  count: number;
+}
+
+/**
  * 攻撃通知
  */
 export interface AttackNotificationMessage {
@@ -148,6 +156,7 @@ export type ServerMessage =
   | JoinedMessage
   | PlayerUpdateMessage
   | GameStartMessage
+  | CountdownMessage
   | AttackNotificationMessage
   | MissNotificationMessage
   | RoundEndMessage

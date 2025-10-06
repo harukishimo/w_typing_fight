@@ -348,6 +348,15 @@ export class RoomDO {
     this.roomState.status = 'playing';
     this.roomState.currentRound = 1;
 
+    // カウントダウン (3, 2, 1, 0)
+    for (let count = 3; count >= 0; count--) {
+      this.broadcast({
+        type: 'countdown',
+        count,
+      });
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
     // 各プレイヤーを初期化しお題を割り当て
     const words: Record<string, Word> = {};
     for (const [playerId, player] of this.roomState.players) {
@@ -363,10 +372,57 @@ export class RoomDO {
       }
     }
 
+    // ゲーム開始通知
     this.broadcast({
       type: 'gameStart',
       round: this.roomState.currentRound,
       words,
+    });
+
+    // START表示後1秒待ってからカウントダウンをクリア
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    this.broadcast({
+      type: 'countdown',
+      count: -1,
+    });
+
+    this.broadcastPlayerUpdate();
+  }
+
+  /**
+   * 次のラウンド開始（カウントダウン付き）
+   */
+  private async startNextRound(): Promise<void> {
+    // カウントダウン (3, 2, 1, 0)
+    for (let count = 3; count >= 0; count--) {
+      this.broadcast({
+        type: 'countdown',
+        count,
+      });
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    // 各プレイヤーに新しいお題を割り当て
+    const words: Record<string, Word> = {};
+    for (const [playerId, player] of this.roomState.players) {
+      const word = this.assignNextWord(playerId);
+      if (word) {
+        words[playerId] = word;
+      }
+    }
+
+    // ゲーム開始通知
+    this.broadcast({
+      type: 'gameStart',
+      round: this.roomState.currentRound,
+      words,
+    });
+
+    // START表示後1秒待ってからカウントダウンをクリア
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    this.broadcast({
+      type: 'countdown',
+      count: -1,
     });
 
     this.broadcastPlayerUpdate();
@@ -411,6 +467,9 @@ export class RoomDO {
       players,
     });
 
+    // ラウンド終了表示を3秒間表示
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
     // 次のラウンドまたはゲーム終了
     if (this.roomState.currentRound < this.roomState.maxRounds) {
       // 次のラウンドへ
@@ -423,6 +482,9 @@ export class RoomDO {
       }
 
       this.broadcastPlayerUpdate();
+
+      // 次のラウンドのカウントダウン開始
+      await this.startNextRound();
     } else {
       // ゲーム終了
       await this.endGame(winnerId);

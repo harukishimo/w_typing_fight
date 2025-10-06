@@ -120,6 +120,10 @@ export const useMatchStore = create<MatchState>((set, get) => ({
 
             break;
           }
+          case 'countdown': {
+            set({ countdown: message.count });
+            break;
+          }
           case 'gameStart': {
             const { playerId } = get();
             if (!playerId) break;

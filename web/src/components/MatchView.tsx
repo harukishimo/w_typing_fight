@@ -6,6 +6,7 @@ import { useMatchStore } from '@/store/matchStore';
 import { useGameStore } from '@/store/gameStore';
 import { TypingGame } from './TypingGame';
 import { HpGauge } from './HpGauge';
+import { Countdown } from './Countdown';
 
 type Props = {
   onBack: () => void;
@@ -37,6 +38,7 @@ export function MatchView({ onBack, initialRoomId }: Props) {
     players,
     playerId,
     roomId: connectedRoom,
+    countdown,
     error,
     clearError,
   } = useMatchStore();
@@ -86,7 +88,9 @@ export function MatchView({ onBack, initialRoomId }: Props) {
 
   if (isPlaying) {
     return (
-      <div className="min-h-screen bg-primary-50">
+      <>
+        <Countdown count={countdown} />
+        <div className="min-h-screen bg-primary-50">
         <div className="max-w-4xl mx-auto p-4">
           <div className="flex justify-between items-center mb-4">
             <button
@@ -108,6 +112,7 @@ export function MatchView({ onBack, initialRoomId }: Props) {
           />
         </div>
       </div>
+      </>
     );
   }
 
