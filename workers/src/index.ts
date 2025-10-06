@@ -17,9 +17,15 @@ export default {
         return new Response('Missing roomId', { status: 400 });
       }
 
+      const roomNamespace = env.ROOM ?? env['w-typing-fight-workers_RoomDO'];
+      if (!roomNamespace) {
+        console.error('[Worker] ROOM Durable Object binding is missing');
+        return new Response('ROOM Durable Object binding missing', { status: 500 });
+      }
+
       // Get Durable Object instance
-      const id = env.ROOM.idFromName(roomId);
-      const stub = env.ROOM.get(id);
+      const id = roomNamespace.idFromName(roomId);
+      const stub = roomNamespace.get(id);
       console.log('[Worker] Forwarding websocket to RoomDO', roomId);
 
       return stub.fetch(request);
@@ -30,5 +36,6 @@ export default {
 };
 
 export interface Env {
-  ROOM: DurableObjectNamespace;
+  ROOM?: DurableObjectNamespace;
+  'w-typing-fight-workers_RoomDO'?: DurableObjectNamespace;
 }
