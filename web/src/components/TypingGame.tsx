@@ -9,6 +9,7 @@ import { useGameStore } from '@/store/gameStore';
 import type { PlayerState } from 'shared';
 import { GAME_CONSTANTS, calculateDamage, getComboMultiplier } from 'shared';
 import { HpGauge } from './HpGauge';
+import { parseHiragana } from '@/utils/hiraganaParser';
 
 type Props = {
   onExit?: () => void;
@@ -63,7 +64,11 @@ export function TypingGame({ onExit, selfPlayer, opponentPlayer }: Props) {
     return null;
   }
 
-  const readingChars = currentWord.reading.split('');
+  // parseHiragana を使用して拗音を正しく分割（romajiMatcherと同じロジック）
+  const readingChars = useMemo(
+    () => parseHiragana(currentWord.reading),
+    [currentWord.reading]
+  );
   const damage = calculateDamage(difficulty, combo);
   const comboMultiplier = getComboMultiplier(difficulty, combo);
   const isMatchMode = mode === 'match';
