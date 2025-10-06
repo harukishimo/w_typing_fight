@@ -9,25 +9,21 @@ import type {
 import { useGameStore } from './gameStore';
 
 // WebSocket URL設定
-// 開発環境: ws://localhost:8787
-// 本番環境: 環境変数 VITE_WORKER_WS_URL を設定するか、自動でwss://に切り替え
+// Pages Functionsを使用するため、同一ドメインで接続
 const getWorkerUrl = (): string => {
   // 環境変数が設定されている場合はそれを使用
   if (import.meta.env.VITE_WORKER_WS_URL) {
     return import.meta.env.VITE_WORKER_WS_URL;
   }
 
-  // 開発環境
+  // 開発環境: ローカルWorkers Dev Server
   if (import.meta.env.DEV) {
     return 'ws://localhost:8787';
   }
 
-  // 本番環境（HTTPSの場合はWSS、HTTPの場合はWS）
+  // 本番環境: Pages Functions (同一ドメイン)
+  // https://w-typing-fight.pages.dev → wss://w-typing-fight.pages.dev
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-
-  // TODO: 実際のWorkers URLに置き換えてください
-  // 例: return `${protocol}//your-workers.workers.dev`;
-  console.warn('VITE_WORKER_WS_URL not set. Using default WebSocket URL.');
   return `${protocol}//${window.location.host}`;
 };
 
