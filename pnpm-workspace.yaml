@@ -1,0 +1,7 @@
+packages:
+  - web
+  - workers
+  - shared
+
+ignoredBuiltDependencies:
+  - inotify
