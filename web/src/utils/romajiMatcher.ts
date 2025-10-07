@@ -38,8 +38,33 @@ export class RomajiMatcher {
       return [];
     }
     const currentChar = this.hiraganaChars[this.currentCharIndex]!;
+    const nextChar = this.hiraganaChars[this.currentCharIndex + 1];
+
+    if (currentChar === 'っ') {
+      const patterns = new Set(['ltu', 'xtu', 'ltsu', 'xtsu']);
+
+      if (nextChar) {
+        const nextPatterns = getRomajiPatterns(nextChar);
+        nextPatterns.forEach(pattern => {
+          if (!pattern) return;
+          const firstChar = pattern[0];
+          if (firstChar) {
+            patterns.add(firstChar);
+          }
+
+          if (pattern.startsWith('ch')) {
+            patterns.add('t');
+          }
+        });
+      }
+
+      const result = Array.from(patterns);
+      console.log(`[RomajiMatcher] 文字「っ」のパターン:`, result);
+      return result;
+    }
+
     let patterns = getRomajiPatterns(currentChar);
-    
+
     // 「ん」の特殊処理: 'n'単体を常に除外（nn必須）
     if (currentChar === 'ん') {
       patterns = patterns.filter(p => p !== 'n');
@@ -47,7 +72,7 @@ export class RomajiMatcher {
     } else {
       console.log(`[RomajiMatcher] 文字「${currentChar}」のパターン:`, patterns);
     }
-    
+
     return patterns;
   }
 

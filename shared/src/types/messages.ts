@@ -93,6 +93,14 @@ export interface CountdownMessage {
 }
 
 /**
+ * ラウンド開始告知
+ */
+export interface RoundIntroMessage {
+  type: 'roundIntro';
+  round: number;
+}
+
+/**
  * 攻撃通知
  */
 export interface AttackNotificationMessage {
@@ -112,6 +120,16 @@ export interface MissNotificationMessage {
   type: 'missNotification';
   playerId: string;
   missCount: number;
+}
+
+/**
+ * ノックアウト通知（ライフ減少）
+ */
+export interface KnockoutMessage {
+  type: 'knockout';
+  playerId: string;
+  remainingLives: number;
+  round: number;
 }
 
 /**
@@ -156,9 +174,11 @@ export type ServerMessage =
   | JoinedMessage
   | PlayerUpdateMessage
   | GameStartMessage
+  | RoundIntroMessage
   | CountdownMessage
   | AttackNotificationMessage
   | MissNotificationMessage
+  | KnockoutMessage
   | RoundEndMessage
   | GameEndMessage
   | PlayerLeftMessage

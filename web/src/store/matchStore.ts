@@ -33,6 +33,7 @@ type MatchStatus =
   | 'idle'
   | 'connecting'
   | 'waiting'
+  | 'countdown'
   | 'ready'
   | 'playing'
   | 'finished';
@@ -52,9 +53,11 @@ interface MatchState {
   players: PlayerState[];
   round: number;
   currentWord: Word | null;
+  roundIntro: number | null;
   countdown: number | null;
   error: string | null;
   socket: WebSocket | null;
+  gameResult: { winnerId: string; players: PlayerState[] } | null;
 
   joinRoom: (options: JoinOptions) => void;
   sendReady: () => void;
@@ -62,7 +65,7 @@ interface MatchState {
   clearError: () => void;
 }
 
-export const useMatchStore = create<MatchState>((set, get) => ({
+const initialState: Omit<MatchState, 'joinRoom' | 'sendReady' | 'leaveRoom' | 'clearError'> = {
   roomId: '',
   playerId: null,
   playerName: '',
@@ -71,9 +74,15 @@ export const useMatchStore = create<MatchState>((set, get) => ({
   players: [],
   round: 1,
   currentWord: null,
+  roundIntro: null,
   countdown: null,
   error: null,
   socket: null,
+  gameResult: null,
+};
+
+export const useMatchStore = create<MatchState>((set, get) => ({
+  ...initialState,
 
   joinRoom: ({ roomId, playerName, difficulty }) => {
     const trimmedRoomId = roomId.trim();
@@ -95,6 +104,7 @@ export const useMatchStore = create<MatchState>((set, get) => ({
         difficulty,
         socket,
         error: null,
+        gameResult: null,
       });
 
       const handleServerMessage = (message: ServerMessage) => {
@@ -118,6 +128,13 @@ export const useMatchStore = create<MatchState>((set, get) => ({
                 ? message.players.find(p => p.playerId === playerId) ?? null
                 : null;
 
+              if (state.status === 'countdown') {
+                return {
+                players: message.players,
+                status: state.status,
+              };
+            }
+
               if (self) {
                 gameStore.syncPlayerState(self);
               }
@@ -138,8 +155,27 @@ export const useMatchStore = create<MatchState>((set, get) => ({
 
             break;
           }
+          case 'roundIntro': {
+            const gameStore = useGameStore.getState();
+            gameStore.pauseMatchRound();
+            set({
+              status: 'countdown',
+              roundIntro: message.round,
+              countdown: null,
+              round: message.round,
+              gameResult: null,
+            });
+            break;
+          }
           case 'countdown': {
-            set({ countdown: message.count });
+            set(state => ({
+              countdown: message.count,
+              roundIntro: message.count >= 0 ? null : state.roundIntro,
+              status:
+                message.count >= 0 && state.status !== 'playing'
+                  ? 'countdown'
+                  : state.status,
+            }));
             break;
           }
           case 'gameStart': {
@@ -153,6 +189,9 @@ export const useMatchStore = create<MatchState>((set, get) => ({
               status: 'playing',
               round: message.round,
               currentWord: assignedWord,
+              roundIntro: null,
+              countdown: null,
+              gameResult: null,
             });
 
             const gameStore = useGameStore.getState();
@@ -196,12 +235,26 @@ export const useMatchStore = create<MatchState>((set, get) => ({
           case 'missNotification': {
             break;
           }
+          case 'knockout': {
+            const gameStore = useGameStore.getState();
+            gameStore.pauseMatchRound();
+            set({ countdown: null, status: 'countdown', roundIntro: null });
+            break;
+          }
           case 'roundEnd': {
-            set({ status: 'waiting', round: message.round });
+            set({ status: 'countdown', round: message.round });
             break;
           }
           case 'gameEnd': {
-            set({ status: 'finished' });
+            set({
+              status: 'finished',
+              countdown: null,
+              roundIntro: null,
+              gameResult: {
+                winnerId: message.winnerId,
+                players: message.players,
+              },
+            });
             const gameStore = useGameStore.getState();
             gameStore.endMatchGame();
             break;
@@ -252,16 +305,16 @@ export const useMatchStore = create<MatchState>((set, get) => ({
         const gameStore = useGameStore.getState();
         gameStore.endMatchGame();
 
-        set({
-          status: 'idle',
-          socket: null,
-          players: [],
-          playerId: null,
-          currentWord: null,
-          countdown: null,
+        set(state => {
+          if (state.status === 'finished') {
+            return {
+              ...state,
+              socket: null,
+            };
+          }
+          window.history.replaceState(null, '', '/match');
+          return { ...initialState };
         });
-
-        window.history.replaceState(null, '', '/match');
       };
     } catch (error) {
       console.error('WebSocket connection error', error);
@@ -283,6 +336,7 @@ export const useMatchStore = create<MatchState>((set, get) => ({
     if (socket) {
       socket.close();
     }
+    set(() => ({ ...initialState }));
   },
 
   clearError: () => set({ error: null }),

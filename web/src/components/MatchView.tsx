@@ -39,6 +39,8 @@ export function MatchView({ onBack, initialRoomId }: Props) {
     playerId,
     roomId: connectedRoom,
     countdown,
+    roundIntro,
+    gameResult,
     error,
     clearError,
   } = useMatchStore();
@@ -68,7 +70,7 @@ export function MatchView({ onBack, initialRoomId }: Props) {
   );
 
   const isConnected = status !== 'idle' && status !== 'connecting' ? playerId !== null : false;
-  const isPlaying = status === 'playing' && gameMode === 'match';
+  const isPlayingView = (status === 'playing' || status === 'countdown') && gameMode === 'match';
 
   const handleJoin = () => {
     clearError();
@@ -86,44 +88,135 @@ export function MatchView({ onBack, initialRoomId }: Props) {
     onBack();
   };
 
-  if (isPlaying) {
+  const countdownOverlay = <Countdown count={countdown} />;
+
+  const roundIntroOverlay = roundIntro !== null ? (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <motion.div
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 1.1, opacity: 0 }}
+        transition={{ duration: 0.4 }}
+        className="text-center bg-white/90 px-12 py-10 rounded-3xl shadow-2xl border border-primary-200"
+      >
+        <div className="text-sm tracking-[0.4em] text-primary-500 uppercase mb-2">Next Round</div>
+        <div className="text-6xl font-black text-primary-700 drop-shadow-sm">Round {roundIntro}</div>
+      </motion.div>
+    </div>
+  ) : null;
+
+  const isWinner = gameResult?.winnerId && playerId && gameResult.winnerId === playerId;
+  const endOverlay = status === 'finished' && gameResult ? (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-lg">
+      <motion.div
+        initial={{ scale: 0.85, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.4 }}
+        className={`relative px-10 py-9 rounded-3xl shadow-2xl border text-center max-w-xl w-full
+          ${gameResult.winnerId
+            ? gameResult.winnerId === playerId
+              ? 'bg-white border-amber-300 text-amber-800'
+              : 'bg-white border-sky-300 text-sky-800'
+            : 'bg-white border-slate-300 text-slate-800'
+          }
+        `}
+      >
+        <div className="text-sm uppercase tracking-[0.4em] mb-3 text-gray-500">
+          {gameResult.winnerId ? 'Battle Result' : 'It’s a Draw'}
+        </div>
+        <div className="text-6xl font-black drop-shadow-sm mb-4 text-gray-900">
+          {gameResult.winnerId
+            ? gameResult.winnerId === playerId
+              ? 'WIN!!!'
+              : 'LOSE...'
+            : 'DRAW'}
+        </div>
+        <div className="text-base mb-6 text-gray-600">
+          {gameResult.winnerId
+            ? gameResult.winnerId === playerId
+              ? 'おめでとう！勝利をつかみました。'
+              : '惜しい！次のバトルでリベンジしよう。'
+            : '互角の勝負でした！'}
+        </div>
+        <div className="bg-gray-50 rounded-2xl p-4 mb-6 border border-gray-200">
+          <div className="text-xs uppercase tracking-[0.3em] text-gray-500 mb-3">Players</div>
+          <div className="space-y-2">
+            {gameResult.players.map(player => {
+              const playerIsWinner = gameResult.winnerId === player.playerId;
+              return (
+                <div
+                  key={player.playerId}
+                  className={`flex items-center justify-between rounded-xl px-4 py-3 text-left
+                    ${playerIsWinner ? 'bg-amber-100 text-amber-900' : 'bg-white text-gray-700 border border-gray-100'}`}
+                >
+                  <div>
+                    <div className="text-sm font-semibold">{player.playerName}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-gray-500">{player.difficulty}</div>
+                  </div>
+                  <div className="text-xs text-gray-500">HP {player.hp} / Lives {player.lives}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <button
+          onClick={handleLeave}
+          className={`px-6 py-3 rounded-2xl font-semibold shadow transition
+            ${isWinner
+              ? 'bg-amber-500 text-white hover:bg-amber-600'
+              : 'bg-sky-500 text-white hover:bg-sky-600'}
+          `}
+        >
+          ロビーへ戻る
+        </button>
+      </motion.div>
+    </div>
+  ) : null;
+
+  if (isPlayingView) {
     return (
       <>
-        <Countdown count={countdown} />
+        {roundIntroOverlay}
+        {countdownOverlay}
+        {endOverlay}
         <div className="min-h-screen bg-primary-50">
-        <div className="max-w-4xl mx-auto p-4">
-          <div className="flex justify-between items-center mb-4">
-            <button
-              onClick={handleLeave}
-              className="px-4 py-2 rounded-lg bg-white text-primary-600 shadow hover:bg-primary-100"
-            >
-              ロビーへ戻る
-            </button>
+          <div className="max-w-4xl mx-auto p-4">
+            <div className="flex justify-between items-center mb-4">
+              <button
+                onClick={handleLeave}
+                className="px-4 py-2 rounded-lg bg-white text-primary-600 shadow hover:bg-primary-100"
+              >
+                ロビーへ戻る
+              </button>
 
-            <div className="bg-white rounded-lg px-4 py-2 shadow text-sm text-primary-700">
-              ルームコード: <span className="font-mono text-lg">{connectedRoom}</span>
+              <div className="bg-white rounded-lg px-4 py-2 shadow text-sm text-primary-700">
+                ルームコード: <span className="font-mono text-lg">{connectedRoom}</span>
+              </div>
             </div>
-          </div>
 
-          <TypingGame
-            onExit={handleLeave}
-            selfPlayer={selfPlayer}
-            opponentPlayer={opponentPlayer}
-          />
+            <TypingGame
+              onExit={handleLeave}
+              selfPlayer={selfPlayer}
+              opponentPlayer={opponentPlayer}
+            />
+          </div>
         </div>
-      </div>
       </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-primary-100 p-4">
-      <div className="max-w-4xl mx-auto space-y-8">
-        <div className="flex justify-between items-center">
-          <button
-            onClick={handleLeave}
-            className="px-4 py-2 bg-white text-primary-600 rounded-lg shadow hover:bg-primary-100"
-          >
+    <>
+      {roundIntroOverlay}
+      {countdownOverlay}
+      {endOverlay}
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-primary-100 p-4">
+        <div className="max-w-4xl mx-auto space-y-8">
+          <div className="flex justify-between items-center">
+            <button
+              onClick={handleLeave}
+              className="px-4 py-2 bg-white text-primary-600 rounded-lg shadow hover:bg-primary-100"
+            >
             ← モード選択へ
           </button>
 
@@ -273,6 +366,7 @@ export function MatchView({ onBack, initialRoomId }: Props) {
         </motion.div>
       </div>
     </div>
+    </>
   );
 }
 

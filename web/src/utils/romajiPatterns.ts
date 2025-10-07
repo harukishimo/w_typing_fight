@@ -3,6 +3,8 @@
  * タイピングゲームで受け入れる複数の入力パターンを定義
  */
 
+import { parseHiragana } from './hiraganaParser';
+
 export interface RomajiPattern {
   hiragana: string;
   patterns: string[];
@@ -70,10 +72,10 @@ export const ROMAJI_PATTERNS: RomajiPattern[] = [
   { hiragana: 'の', patterns: ['no'] },
 
   // は行
-  { hiragana: 'は', patterns: ['ha'] },
+  { hiragana: 'は', patterns: ['wa', 'ha'] },
   { hiragana: 'ひ', patterns: ['hi'] },
   { hiragana: 'ふ', patterns: ['fu', 'hu'] },
-  { hiragana: 'へ', patterns: ['he'] },
+  { hiragana: 'へ', patterns: ['e', 'he'] },
   { hiragana: 'ほ', patterns: ['ho'] },
 
   // ば行
@@ -230,5 +232,29 @@ export function hiraganaToRomajiVariants(text: string): string[][] {
  * ひらがな文字列からデフォルトのローマ字文字列を生成
  */
 export function hiraganaToDefaultRomaji(text: string): string {
-  return Array.from(text).map(char => getDefaultRomaji(char)).join('');
+  const chars = parseHiragana(text);
+  let result = '';
+
+  for (let i = 0; i < chars.length; i++) {
+    const char = chars[i]!;
+
+    if (char === 'っ') {
+      const nextChar = chars[i + 1];
+      if (nextChar) {
+        const nextPatterns = getRomajiPatterns(nextChar);
+        const shortest = nextPatterns.reduce((shortestPattern, current) =>
+          current.length < shortestPattern.length ? current : shortestPattern
+        , nextPatterns[0] ?? '');
+
+        if (shortest) {
+          result += shortest[0] ?? '';
+          continue;
+        }
+      }
+    }
+
+    result += getDefaultRomaji(char);
+  }
+
+  return result;
 }

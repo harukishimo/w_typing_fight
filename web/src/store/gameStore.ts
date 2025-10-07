@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import type { Difficulty, Word, PlayerState } from 'shared';
 import { calculateDamage, GAME_CONSTANTS, getRandomWord } from 'shared';
 import { RomajiMatcher } from '@/utils/romajiMatcher';
+import { hiraganaToDefaultRomaji } from '@/utils/romajiPatterns';
 
 type GameMode = 'solo' | 'match';
 
@@ -57,6 +58,7 @@ interface GameState {
   nextWord: () => void;
   setMatchWord: (word: Word) => void;
   endMatchGame: () => void;
+  pauseMatchRound: () => void;
   syncPlayerState: (player: Pick<PlayerState, 'hp' | 'lives' | 'combo' | 'missCount'>) => void;
 }
 
@@ -95,7 +97,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set({
       currentWord: word,
-      expectedRomaji: word.romaji,
+      expectedRomaji: hiraganaToDefaultRomaji(word.reading),
       romajiMatcher: matcher,
       hp: GAME_CONSTANTS.INITIAL_HP,
       lives: GAME_CONSTANTS.INITIAL_LIVES,
@@ -120,7 +122,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({
       difficulty,
       currentWord: word,
-      expectedRomaji: word.romaji,
+      expectedRomaji: hiraganaToDefaultRomaji(word.reading),
       romajiMatcher: matcher,
       currentInput: '',
       currentCharIndex: 0,
@@ -228,7 +230,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set({
       currentWord: word,
-      expectedRomaji: word.romaji,
+      expectedRomaji: hiraganaToDefaultRomaji(word.reading),
       romajiMatcher: matcher,
       currentInput: '',
       currentCharIndex: 0,
@@ -244,12 +246,24 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set({
       currentWord: word,
-      expectedRomaji: word.romaji,
+      expectedRomaji: hiraganaToDefaultRomaji(word.reading),
       romajiMatcher: matcher,
       currentInput: '',
       currentCharIndex: 0,
       currentWordMisses: 0,
       startTime: Date.now(),
+      isPlaying: true,
+    });
+  },
+
+  pauseMatchRound: () => {
+    set({
+      isPlaying: false,
+      romajiMatcher: null,
+      currentInput: '',
+      currentWordMisses: 0,
+      startTime: null,
+      expectedRomaji: '',
     });
   },
 

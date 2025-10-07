@@ -345,85 +345,64 @@ export class RoomDO {
    * ゲーム開始
    */
   private async startGame(): Promise<void> {
-    this.roomState.status = 'playing';
-    this.roomState.currentRound = 1;
+    this.roomState.status = 'waiting';
+    this.roomState.currentRound = 0;
 
-    // カウントダウン (3, 2, 1, 0)
-    for (let count = 3; count >= 0; count--) {
-      this.broadcast({
-        type: 'countdown',
-        count,
-      });
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-
-    // 各プレイヤーを初期化しお題を割り当て
-    const words: Record<string, Word> = {};
-    for (const [playerId, player] of this.roomState.players) {
+    for (const player of this.roomState.players.values()) {
       player.hp = GAME_CONSTANTS.INITIAL_HP;
       player.lives = GAME_CONSTANTS.INITIAL_LIVES;
       player.combo = 0;
       player.missCount = 0;
       player.isReady = false;
-
-      const word = this.assignNextWord(playerId);
-      if (word) {
-        words[playerId] = word;
-      }
+      player.currentWord = null;
     }
 
-    // ゲーム開始通知
-    this.broadcast({
-      type: 'gameStart',
-      round: this.roomState.currentRound,
-      words,
-    });
-
-    // START表示後1秒待ってからカウントダウンをクリア
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    this.broadcast({
-      type: 'countdown',
-      count: -1,
-    });
-
-    this.broadcastPlayerUpdate();
+    await this.beginRound(true);
   }
 
   /**
-   * 次のラウンド開始（カウントダウン付き）
+   * ラウンド開始処理（ラウンド番号カウントと演出）
    */
-  private async startNextRound(): Promise<void> {
-    // カウントダウン (3, 2, 1, 0)
-    for (let count = 3; count >= 0; count--) {
-      this.broadcast({
-        type: 'countdown',
-        count,
-      });
-      await new Promise(resolve => setTimeout(resolve, 1000));
+  private async beginRound(incrementRound: boolean): Promise<void> {
+    this.roomState.status = 'waiting';
+
+    if (incrementRound) {
+      this.roomState.currentRound = Math.min(
+        this.roomState.currentRound + 1,
+        this.roomState.maxRounds
+      );
     }
 
-    // 各プレイヤーに新しいお題を割り当て
+    for (const player of this.roomState.players.values()) {
+      player.hp = GAME_CONSTANTS.INITIAL_HP;
+      player.combo = 0;
+      player.missCount = 0;
+      player.isReady = false;
+      player.currentWord = null;
+    }
+
+    this.broadcastPlayerUpdate();
+
+    await this.showRoundIntroAndCountdown();
+
     const words: Record<string, Word> = {};
-    for (const [playerId, player] of this.roomState.players) {
+    for (const [playerId] of this.roomState.players) {
       const word = this.assignNextWord(playerId);
       if (word) {
         words[playerId] = word;
       }
     }
 
-    // ゲーム開始通知
+    this.roomState.status = 'playing';
+
     this.broadcast({
       type: 'gameStart',
       round: this.roomState.currentRound,
       words,
     });
 
-    // START表示後1秒待ってからカウントダウンをクリア
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    this.broadcast({
-      type: 'countdown',
-      count: -1,
-    });
+    await this.sleep(1000);
+    this.broadcast({ type: 'countdown', count: -1 });
 
     this.broadcastPlayerUpdate();
   }
@@ -436,59 +415,50 @@ export class RoomDO {
     if (!player) return;
 
     // ライフ減少
-    player.lives -= 1;
-    player.hp = GAME_CONSTANTS.INITIAL_HP; // HP回復
+    player.hp = 0;
+    player.lives = Math.max(0, player.lives - 1);
     player.combo = 0;
+    player.missCount = 0;
+
+    this.broadcast({
+      type: 'knockout',
+      playerId: knockedPlayerId,
+      remainingLives: player.lives,
+      round: this.roomState.currentRound,
+    });
+
+    this.roomState.status = 'waiting';
 
     this.broadcastPlayerUpdate();
 
-    // ライフが尽きたらラウンド終了
-    if (player.lives === 0) {
-      const winnerId = Array.from(this.roomState.players.keys()).find(
-        id => id !== knockedPlayerId
-      );
+    const opponentId = Array.from(this.roomState.players.keys()).find(
+      id => id !== knockedPlayerId
+    );
 
-      if (winnerId) {
-        await this.endRound(winnerId);
-      }
-    }
-  }
+    const winnerId = opponentId ?? knockedPlayerId;
 
-  /**
-   * ラウンド終了
-   */
-  private async endRound(winnerId: string): Promise<void> {
-    const players = Array.from(this.roomState.players.values());
+    const snapshot = Array.from(this.roomState.players.values());
 
     this.broadcast({
       type: 'roundEnd',
       round: this.roomState.currentRound,
       winnerId,
-      players,
+      players: snapshot,
     });
 
-    // ラウンド終了表示を3秒間表示
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await this.sleep(2000);
 
-    // 次のラウンドまたはゲーム終了
-    if (this.roomState.currentRound < this.roomState.maxRounds) {
-      // 次のラウンドへ
-      this.roomState.currentRound += 1;
-      for (const player of this.roomState.players.values()) {
-        player.hp = GAME_CONSTANTS.INITIAL_HP;
-        player.combo = 0;
-        player.missCount = 0;
-        player.isReady = false;
-      }
-
-      this.broadcastPlayerUpdate();
-
-      // 次のラウンドのカウントダウン開始
-      await this.startNextRound();
-    } else {
-      // ゲーム終了
+    if (player.lives <= 0) {
       await this.endGame(winnerId);
+      return;
     }
+
+    if (this.roomState.currentRound >= this.roomState.maxRounds) {
+      await this.endGame(winnerId);
+      return;
+    }
+
+    await this.beginRound(true);
   }
 
   /**
@@ -507,6 +477,24 @@ export class RoomDO {
     });
 
     // TODO: Supabaseに試合結果を保存
+  }
+
+  private async showRoundIntroAndCountdown(): Promise<void> {
+    this.broadcast({
+      type: 'roundIntro',
+      round: this.roomState.currentRound,
+    });
+
+    await this.sleep(1500);
+
+    for (let count = 3; count >= 0; count--) {
+      this.broadcast({ type: 'countdown', count });
+      await this.sleep(1000);
+    }
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   private assignNextWord(playerId: string): Word | null {

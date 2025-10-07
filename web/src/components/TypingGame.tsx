@@ -9,7 +9,6 @@ import { useGameStore } from '@/store/gameStore';
 import type { PlayerState } from 'shared';
 import { GAME_CONSTANTS, calculateDamage, getComboMultiplier } from 'shared';
 import { HpGauge } from './HpGauge';
-import { parseHiragana } from '@/utils/hiraganaParser';
 
 type Props = {
   onExit?: () => void;
@@ -21,7 +20,6 @@ export function TypingGame({ onExit, selfPlayer, opponentPlayer }: Props) {
   const {
     currentWord,
     currentInput,
-    expectedRomaji,
     romajiMatcher,
     combo,
     missCount,
@@ -65,12 +63,9 @@ export function TypingGame({ onExit, selfPlayer, opponentPlayer }: Props) {
   }
 
   // parseHiragana を使用して拗音を正しく分割（romajiMatcherと同じロジック）
-  const readingChars = useMemo(
-    () => parseHiragana(currentWord.reading),
-    [currentWord.reading]
-  );
   const damage = calculateDamage(difficulty, combo);
   const comboMultiplier = getComboMultiplier(difficulty, combo);
+  const inputDisplayClass = difficulty === 'HARD' ? 'text-2xl' : 'text-3xl';
   const isMatchMode = mode === 'match';
 
   const progress = romajiMatcher?.getProgress();
@@ -189,32 +184,9 @@ export function TypingGame({ onExit, selfPlayer, opponentPlayer }: Props) {
             {currentWord.text}
           </div>
 
-          <div className="flex justify-center gap-1 text-4xl font-mono mb-4">
-            {readingChars.map((char, index) => {
-              const isCompleted = progress && index < progress.completedChars;
-              const isCurrent = progress && index === progress.completedChars;
-              return (
-                <span
-                  key={index}
-                  className={`
-                    ${isCompleted ? 'text-green-500' : 'text-gray-600'}
-                    ${isCurrent ? 'border-b-4 border-primary-500' : ''}
-                  `}
-                >
-                  {char}
-                </span>
-              );
-            })}
-          </div>
-
-          <div className="text-center mb-6">
-            <div className="text-sm text-gray-500 mb-2">読み方</div>
-            <div className="text-2xl font-mono text-gray-600">{expectedRomaji}</div>
-          </div>
-
           <div className="text-center">
             <div className="text-sm text-gray-500 mb-2">入力</div>
-            <div className="text-3xl font-mono">
+            <div className={`${inputDisplayClass} font-mono break-words break-all max-w-full mx-auto`}>
               <span className="text-green-500">{currentInput}</span>
               <span className="text-gray-300">{remainingInput}</span>
             </div>
