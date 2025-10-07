@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { DIFFICULTY_CONFIG } from 'shared';
+import { LeaderboardPanel } from './LeaderboardPanel';
 
 type Props = {
   onSelectSolo: () => void;
@@ -80,6 +81,9 @@ export function ModeSelect({ onSelectSolo, onSelectMatch }: Props) {
             </p>
           </motion.button>
         </div>
+
+
+        <LeaderboardPanel />
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}

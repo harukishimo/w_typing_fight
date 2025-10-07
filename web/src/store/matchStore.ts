@@ -7,6 +7,7 @@ import type {
   Word,
 } from 'shared';
 import { useGameStore } from './gameStore';
+import { useAuthStore } from '@/store/authStore';
 
 // WebSocket URL設定
 // Pages Functionsを使用するため、同一ドメインで接続
@@ -90,6 +91,12 @@ export const useMatchStore = create<MatchState>((set, get) => ({
       set({ error: 'ルームコードを入力してください。' });
       return;
     }
+
+    const { session, user } = useAuthStore.getState();
+    const authPayload =
+      session?.access_token && user?.id
+        ? { accessToken: session.access_token, userId: user.id }
+        : undefined;
 
     const wsUrl = `${DEFAULT_WORKER_URL}/?roomId=${encodeURIComponent(trimmedRoomId)}`;
 
@@ -276,11 +283,18 @@ export const useMatchStore = create<MatchState>((set, get) => ({
 
       socket.onopen = () => {
         console.log('[MatchStore] WebSocket open, sending join');
-        const joinMessage: ClientMessage = {
-          type: 'join',
-          playerName,
-          difficulty,
-        };
+        const joinMessage: ClientMessage = authPayload
+          ? {
+              type: 'join',
+              playerName,
+              difficulty,
+              auth: authPayload,
+            }
+          : {
+              type: 'join',
+              playerName,
+              difficulty,
+            };
         socket.send(JSON.stringify(joinMessage));
       };
 

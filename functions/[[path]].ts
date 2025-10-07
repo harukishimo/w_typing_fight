@@ -7,6 +7,9 @@ export { RoomDO };
 interface Env {
   ROOM?: DurableObjectNamespace;
   'w-typing-fight-workers_RoomDO'?: DurableObjectNamespace;
+  SUPABASE_URL?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
+  SUPABASE_ANON_KEY?: string;
 }
 
 export const onRequest: PagesFunction<Env> = async (context) => {

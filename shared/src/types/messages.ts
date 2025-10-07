@@ -16,6 +16,10 @@ export interface JoinMessage {
   type: 'join';
   playerName: string;
   difficulty: Difficulty;
+  auth?: {
+    userId: string;
+    accessToken: string;
+  };
 }
 
 /**

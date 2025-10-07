@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import { DifficultySelect } from '@/components/DifficultySelect';
 import { TypingGame } from '@/components/TypingGame';
 import { ModeSelect } from '@/components/ModeSelect';
 import { MatchView } from '@/components/MatchView';
+import { AuthBar } from '@/components/AuthBar';
 import { useGameStore } from '@/store/gameStore';
 import { useMatchStore } from '@/store/matchStore';
 
@@ -68,24 +69,25 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  let content: JSX.Element;
+
   if (mode === 'solo') {
-    return (
+    content = (
       <div className="min-h-screen">
-        {isPlaying ? (
-          <TypingGame onExit={handleExitSolo} />
-        ) : (
-          <DifficultySelect onBack={handleBackToMode} />
-        )}
+        {isPlaying ? <TypingGame onExit={handleExitSolo} /> : <DifficultySelect onBack={handleBackToMode} />}
       </div>
     );
-  }
-
-  if (mode === 'match') {
-    return <MatchView onBack={handleBackToMode} initialRoomId={initialRoomId ?? undefined} />;
+  } else if (mode === 'match') {
+    content = <MatchView onBack={handleBackToMode} initialRoomId={initialRoomId ?? undefined} />;
+  } else {
+    content = <ModeSelect onSelectSolo={handleSelectSolo} onSelectMatch={handleSelectMatch} />;
   }
 
   return (
-    <ModeSelect onSelectSolo={handleSelectSolo} onSelectMatch={handleSelectMatch} />
+    <>
+      <AuthBar />
+      {content}
+    </>
   );
 }
 

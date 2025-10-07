@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { Difficulty, PlayerState } from 'shared';
 import { GAME_CONSTANTS } from 'shared';
@@ -7,6 +7,8 @@ import { useGameStore } from '@/store/gameStore';
 import { TypingGame } from './TypingGame';
 import { HpGauge } from './HpGauge';
 import { Countdown } from './Countdown';
+import { useAuthStore } from '@/store/authStore';
+import { useProfileStore } from '@/store/profileStore';
 
 type Props = {
   onBack: () => void;
@@ -29,6 +31,7 @@ export function MatchView({ onBack, initialRoomId }: Props) {
   const [roomId, setRoomId] = useState(initialRoomId ?? '');
   const [playerName, setPlayerName] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty>('EASY');
+  const [hasEditedName, setHasEditedName] = useState(false);
 
   const {
     status,
@@ -46,6 +49,18 @@ export function MatchView({ onBack, initialRoomId }: Props) {
   } = useMatchStore();
 
   const gameMode = useGameStore(state => state.mode);
+  const user = useAuthStore((state) => state.user);
+  const supabaseReady = useAuthStore((state) => state.supabaseReady);
+  const isAuthLoading = useAuthStore((state) => state.isLoading);
+  const signInWithProvider = useAuthStore((state) => state.signInWithProvider);
+  const authDisplayName =
+    user?.user_metadata?.display_name ||
+    user?.user_metadata?.full_name ||
+    user?.email ||
+    null;
+  const previousUserIdRef = useRef<string | null>(null);
+  const profileDisplayName = useProfileStore(state => state.displayName);
+  const profileFallbackName = useProfileStore(state => state.fallbackName);
 
   useEffect(() => {
     return () => {
@@ -58,6 +73,34 @@ export function MatchView({ onBack, initialRoomId }: Props) {
       setRoomId(initialRoomId);
     }
   }, [initialRoomId]);
+
+  useEffect(() => {
+    const currentUserId = user?.id ?? null;
+    if (currentUserId !== previousUserIdRef.current) {
+      previousUserIdRef.current = currentUserId;
+      setHasEditedName(false);
+    }
+  }, [user?.id]);
+
+  const preferredDisplayName = useMemo(() => {
+    const profileName = profileDisplayName?.trim();
+    if (profileName) {
+      return profileName;
+    }
+
+    const fallbackName = profileFallbackName?.trim();
+    if (fallbackName) {
+      return fallbackName;
+    }
+
+    return authDisplayName ?? '';
+  }, [profileDisplayName, profileFallbackName, authDisplayName]);
+
+  useEffect(() => {
+    if (!hasEditedName && playerName !== preferredDisplayName) {
+      setPlayerName(preferredDisplayName);
+    }
+  }, [preferredDisplayName, hasEditedName, playerName]);
 
   const selfPlayer = useMemo(
     () => players.find(player => player.playerId === playerId) ?? null,
@@ -74,7 +117,12 @@ export function MatchView({ onBack, initialRoomId }: Props) {
 
   const handleJoin = () => {
     clearError();
-    joinRoom({ roomId, playerName, difficulty });
+    const trimmedName = playerName.trim();
+    const trimmedRoomId = roomId.trim();
+    if (!trimmedName || !trimmedRoomId) {
+      return;
+    }
+    joinRoom({ roomId: trimmedRoomId, playerName: trimmedName, difficulty });
   };
 
   const handleGenerateCode = () => {
@@ -247,10 +295,40 @@ export function MatchView({ onBack, initialRoomId }: Props) {
                 </label>
                 <input
                   value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setPlayerName(value);
+                    setHasEditedName(value.trim().length > 0);
+                  }}
                   placeholder="例: WakaFighter"
                   className="w-full px-4 py-2 rounded-lg border border-primary-200 focus:outline-none focus:ring-2 focus:ring-primary-400"
                 />
+                <div className="rounded-lg border border-primary-100 bg-primary-50/70 px-3 py-2 text-xs text-primary-600">
+                  {user ? (
+                    <span>
+                      <span className="font-semibold text-primary-800">{authDisplayName}</span>
+                      さんがログイン中です。対戦結果はランキングに記録されます。
+                    </span>
+                  ) : supabaseReady ? (
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-left sm:text-sm">
+                        ランキングに名前を残すには Google でログインしてください。
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void signInWithProvider('google')}
+                        disabled={isAuthLoading}
+                        className="w-full sm:w-auto rounded-lg bg-[#4285F4]/10 px-3 py-1.5 text-xs font-semibold text-[#4285F4] hover:bg-[#4285F4]/20 disabled:opacity-60"
+                      >
+                        Google ログイン
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-amber-700">
+                      Supabase の設定が未完了のため、ランキング登録は現在無効です。
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -300,7 +378,7 @@ export function MatchView({ onBack, initialRoomId }: Props) {
               <button
                 type="button"
                 onClick={handleJoin}
-                disabled={!playerName || !roomId || status === 'connecting'}
+                disabled={!playerName.trim() || !roomId.trim() || status === 'connecting'}
                 className={`w-full py-3 rounded-xl font-bold text-lg shadow transition ${
                   status === 'connecting'
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
