@@ -702,6 +702,9 @@ export class RoomDO {
     const { winner, loser, winnerAuth, loserAuth, roomId } = params;
 
     if (!winnerAuth?.userId) {
+      if (loserAuth?.userId) {
+        await this.resetUserStreak(loserAuth.userId);
+      }
       console.log('[RoomDO] Skipping match logging because winner is not authenticated');
       return;
     }
@@ -735,6 +738,39 @@ export class RoomDO {
       }
     } catch (error) {
       console.error('[RoomDO] Error persisting match result', error);
+    }
+  }
+
+  private async resetUserStreak(userId: string): Promise<void> {
+    const supabaseUrl = this.env.SUPABASE_URL;
+    const serviceRoleKey = this.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.warn('[RoomDO] Supabase environment not configured; skipping streak reset');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${supabaseUrl}/rest/v1/user_streaks?on_conflict=user_id`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+          Prefer: 'resolution=merge-duplicates,return=minimal',
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          current_streak: 0,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[RoomDO] Failed to reset user streak', response.status, errorText);
+      }
+    } catch (error) {
+      console.error('[RoomDO] Error resetting user streak', error);
     }
   }
 }
