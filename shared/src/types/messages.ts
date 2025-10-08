@@ -47,13 +47,21 @@ export interface MissMessage {
 }
 
 /**
+ * 接続維持用ハートビート
+ */
+export interface PingMessage {
+  type: 'ping';
+}
+
+/**
  * クライアントから送信可能なメッセージ
  */
 export type ClientMessage =
   | JoinMessage
   | ReadyMessage
   | AttackMessage
-  | MissMessage;
+  | MissMessage
+  | PingMessage;
 
 // ============================================================
 // Server → Client メッセージ
@@ -172,6 +180,13 @@ export interface ErrorMessage {
 }
 
 /**
+ * ハートビート応答
+ */
+export interface PongMessage {
+  type: 'pong';
+}
+
+/**
  * サーバーから送信可能なメッセージ
  */
 export type ServerMessage =
@@ -186,7 +201,8 @@ export type ServerMessage =
   | RoundEndMessage
   | GameEndMessage
   | PlayerLeftMessage
-  | ErrorMessage;
+  | ErrorMessage
+  | PongMessage;
 
 /**
  * 全メッセージ型

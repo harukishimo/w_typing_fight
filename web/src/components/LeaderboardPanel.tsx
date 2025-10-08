@@ -66,7 +66,7 @@ export function LeaderboardPanel({ title = '連勝ランキング', limit = 10 }
                     : 'border-primary-100 bg-white text-primary-700'
                 }`}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-start gap-3">
                   <span className="font-semibold text-lg text-primary-500">{index + 1}</span>
                   <div>
                     <div className="font-semibold">{entry.display_name}</div>

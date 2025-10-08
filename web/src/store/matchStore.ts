@@ -82,21 +82,101 @@ const initialState: Omit<MatchState, 'joinRoom' | 'sendReady' | 'leaveRoom' | 'c
   gameResult: null,
 };
 
-export const useMatchStore = create<MatchState>((set, get) => ({
-  ...initialState,
+export const useMatchStore = create<MatchState>((set, get) => {
+  const HEARTBEAT_INTERVAL = 30_000;
+  const HEARTBEAT_TIMEOUT = HEARTBEAT_INTERVAL * 2;
+  const RECONNECT_DELAY = 2_000;
+  const MAX_RECONNECT_ATTEMPTS = 5;
 
-  joinRoom: ({ roomId, playerName, difficulty }) => {
-    const trimmedRoomId = roomId.trim();
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let manualDisconnect = false;
+  let lastPongAt = 0;
+  let reconnectAttempts = 0;
+  let lastJoinOptions: JoinOptions | null = null;
+
+  const clearHeartbeat = () => {
+    if (heartbeatTimer !== null) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+  };
+
+  const clearReconnectTimer = () => {
+    if (reconnectTimer !== null) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+  };
+
+  const cleanupTimers = () => {
+    clearHeartbeat();
+    clearReconnectTimer();
+  };
+
+  const startHeartbeat = (socket: WebSocket) => {
+    clearHeartbeat();
+    lastPongAt = Date.now();
+    heartbeatTimer = setInterval(() => {
+      if (socket.readyState !== WebSocket.OPEN) {
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastPongAt > HEARTBEAT_TIMEOUT) {
+        console.warn('[MatchStore] Heartbeat timeout detected, closing socket');
+        socket.close();
+        return;
+      }
+
+      const pingMessage: ClientMessage = { type: 'ping' };
+      socket.send(JSON.stringify(pingMessage));
+    }, HEARTBEAT_INTERVAL);
+  };
+
+  const scheduleReconnect = () => {
+    clearReconnectTimer();
+
+    if (!lastJoinOptions) {
+      return;
+    }
+
+    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      console.warn('[MatchStore] Reconnect attempts exceeded');
+      manualDisconnect = true;
+      lastJoinOptions = null;
+      cleanupTimers();
+      window.history.replaceState(null, '', '/match');
+      set(() => ({
+        ...initialState,
+        error: '接続が切断されました。もう一度入室してください。',
+      }));
+      return;
+    }
+
+    reconnectAttempts += 1;
+    const delay = RECONNECT_DELAY * reconnectAttempts;
+    console.log('[MatchStore] Scheduling reconnect attempt', reconnectAttempts, 'in', delay, 'ms');
+
+    reconnectTimer = setTimeout(() => {
+      if (!lastJoinOptions) {
+        return;
+      }
+      console.log('[MatchStore] Attempting reconnect', reconnectAttempts);
+      connect(lastJoinOptions);
+    }, delay);
+  };
+
+  const connect = (options: JoinOptions) => {
+    const trimmedRoomId = options.roomId.trim();
     if (!trimmedRoomId) {
       set({ error: 'ルームコードを入力してください。' });
       return;
     }
 
-    const { session, user } = useAuthStore.getState();
-    const authPayload =
-      session?.access_token && user?.id
-        ? { accessToken: session.access_token, userId: user.id }
-        : undefined;
+    manualDisconnect = false;
+    lastJoinOptions = { ...options, roomId: trimmedRoomId };
+    cleanupTimers();
 
     const wsUrl = `${DEFAULT_WORKER_URL}/?roomId=${encodeURIComponent(trimmedRoomId)}`;
 
@@ -107,8 +187,8 @@ export const useMatchStore = create<MatchState>((set, get) => ({
       set({
         status: 'connecting',
         roomId: trimmedRoomId,
-        playerName,
-        difficulty,
+        playerName: options.playerName,
+        difficulty: options.difficulty,
         socket,
         error: null,
         gameResult: null,
@@ -135,23 +215,19 @@ export const useMatchStore = create<MatchState>((set, get) => ({
                 ? message.players.find(p => p.playerId === playerId) ?? null
                 : null;
 
-              if (state.status === 'countdown') {
-                return {
-                players: message.players,
-                status: state.status,
-              };
-            }
-
               if (self) {
                 gameStore.syncPlayerState(self);
               }
 
+              if (state.status === 'countdown') {
+                return {
+                  players: message.players,
+                  status: state.status,
+                };
+              }
+
               if (state.status !== 'playing' && state.status !== 'finished') {
-                if (!playerId || !self) {
-                  nextStatus = 'waiting';
-                } else {
-                  nextStatus = self.isReady ? 'ready' : 'waiting';
-                }
+                nextStatus = !playerId || !self ? 'waiting' : self.isReady ? 'ready' : 'waiting';
               }
 
               return {
@@ -207,8 +283,8 @@ export const useMatchStore = create<MatchState>((set, get) => ({
               difficulty,
               word: assignedWord,
               onWordComplete: (payload) => {
-                const { socket } = get();
-                if (!socket || socket.readyState !== WebSocket.OPEN) return;
+                const { socket: currentSocket } = get();
+                if (!currentSocket || currentSocket.readyState !== WebSocket.OPEN) return;
 
                 const attackMessage: ClientMessage = {
                   type: 'attack',
@@ -216,15 +292,15 @@ export const useMatchStore = create<MatchState>((set, get) => ({
                   timeTaken: payload.timeTaken,
                   missCount: payload.missCount,
                 };
-                socket.send(JSON.stringify(attackMessage));
+                currentSocket.send(JSON.stringify(attackMessage));
               },
               onMiss: () => {
-                const { socket } = get();
-                if (!socket || socket.readyState !== WebSocket.OPEN) return;
+                const { socket: currentSocket } = get();
+                if (!currentSocket || currentSocket.readyState !== WebSocket.OPEN) return;
                 const missMessage: ClientMessage = {
                   type: 'miss',
                 };
-                socket.send(JSON.stringify(missMessage));
+                currentSocket.send(JSON.stringify(missMessage));
               },
             });
 
@@ -276,6 +352,10 @@ export const useMatchStore = create<MatchState>((set, get) => ({
             set({ error: message.message });
             break;
           }
+          case 'pong': {
+            lastPongAt = Date.now();
+            break;
+          }
           default:
             break;
         }
@@ -283,17 +363,27 @@ export const useMatchStore = create<MatchState>((set, get) => ({
 
       socket.onopen = () => {
         console.log('[MatchStore] WebSocket open, sending join');
+        reconnectAttempts = 0;
+        lastPongAt = Date.now();
+        startHeartbeat(socket);
+
+        const { session, user } = useAuthStore.getState();
+        const authPayload =
+          session?.access_token && user?.id
+            ? { accessToken: session.access_token, userId: user.id }
+            : undefined;
+
         const joinMessage: ClientMessage = authPayload
           ? {
               type: 'join',
-              playerName,
-              difficulty,
+              playerName: options.playerName,
+              difficulty: options.difficulty,
               auth: authPayload,
             }
           : {
               type: 'join',
-              playerName,
-              difficulty,
+              playerName: options.playerName,
+              difficulty: options.difficulty,
             };
         socket.send(JSON.stringify(joinMessage));
       };
@@ -310,14 +400,35 @@ export const useMatchStore = create<MatchState>((set, get) => ({
 
       socket.onerror = (event) => {
         console.error('[MatchStore] WebSocket error', event);
-        set({ error: '接続中にエラーが発生しました。', status: 'idle' });
-        window.history.replaceState(null, '', '/match');
+        set(state => ({
+          ...state,
+          error: '接続中にエラーが発生しました。',
+        }));
       };
 
       socket.onclose = (event) => {
         console.log('[MatchStore] WebSocket closed', event);
         const gameStore = useGameStore.getState();
         gameStore.endMatchGame();
+        cleanupTimers();
+
+        const currentStatus = get().status;
+        const shouldAttemptReconnect =
+          !manualDisconnect &&
+          lastJoinOptions !== null &&
+          currentStatus !== 'finished';
+
+        if (shouldAttemptReconnect) {
+          set(state => ({
+            ...state,
+            socket: null,
+            playerId: null,
+            status: 'connecting',
+            error: '接続が切断されました。再接続しています…',
+          }));
+          scheduleReconnect();
+          return;
+        }
 
         set(state => {
           if (state.status === 'finished') {
@@ -334,24 +445,43 @@ export const useMatchStore = create<MatchState>((set, get) => ({
       console.error('WebSocket connection error', error);
       set({ error: 'WebSocket接続に失敗しました。', status: 'idle' });
     }
-  },
+  };
 
-  sendReady: () => {
-    const { socket, status } = get();
-    if (!socket || socket.readyState !== WebSocket.OPEN) return;
-    if (status === 'ready' || status === 'playing') return;
+  return {
+    ...initialState,
 
-    const readyMessage: ClientMessage = { type: 'ready' };
-    socket.send(JSON.stringify(readyMessage));
-  },
+    joinRoom: ({ roomId, playerName, difficulty }) => {
+      reconnectAttempts = 0;
+      connect({ roomId, playerName, difficulty });
+    },
 
-  leaveRoom: () => {
-    const { socket } = get();
-    if (socket) {
-      socket.close();
-    }
-    set(() => ({ ...initialState }));
-  },
+    sendReady: () => {
+      const { socket, status } = get();
+      if (!socket || socket.readyState !== WebSocket.OPEN) return;
+      if (status === 'ready' || status === 'playing') return;
 
-  clearError: () => set({ error: null }),
-}));
+      const readyMessage: ClientMessage = { type: 'ready' };
+      socket.send(JSON.stringify(readyMessage));
+    },
+
+    leaveRoom: () => {
+      manualDisconnect = true;
+      lastJoinOptions = null;
+      reconnectAttempts = 0;
+      cleanupTimers();
+
+      const { socket } = get();
+      if (socket) {
+        try {
+          socket.close();
+        } catch (error) {
+          console.error('[MatchStore] Error closing socket', error);
+        }
+      }
+
+      set(() => ({ ...initialState }));
+    },
+
+    clearError: () => set({ error: null }),
+  };
+});

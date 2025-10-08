@@ -144,6 +144,9 @@ export class RoomDO {
         case 'miss':
           await this.handleMiss(websocket);
           break;
+        case 'ping':
+          this.send(websocket, { type: 'pong' });
+          break;
         default:
           this.sendError(websocket, 'Unknown message type');
       }
