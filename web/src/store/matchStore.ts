@@ -194,6 +194,9 @@ export const useMatchStore = create<MatchState>((set, get) => {
         gameResult: null,
       });
 
+      const gameStore = useGameStore.getState();
+      gameStore.enterMatchLobby({ difficulty: options.difficulty });
+
       const handleServerMessage = (message: ServerMessage) => {
         switch (message.type) {
           case 'joined': {
@@ -478,6 +481,9 @@ export const useMatchStore = create<MatchState>((set, get) => {
           console.error('[MatchStore] Error closing socket', error);
         }
       }
+
+      const gameStore = useGameStore.getState();
+      gameStore.endMatchGame();
 
       set(() => ({ ...initialState }));
     },

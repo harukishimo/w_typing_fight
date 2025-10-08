@@ -60,6 +60,7 @@ interface GameState {
   endMatchGame: () => void;
   pauseMatchRound: () => void;
   syncPlayerState: (player: Pick<PlayerState, 'hp' | 'lives' | 'combo' | 'missCount'>) => void;
+  enterMatchLobby: (params: { difficulty: Difficulty | null }) => void;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -285,6 +286,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       combo: player.combo,
       missCount: player.missCount,
     });
+  },
+
+  enterMatchLobby: ({ difficulty }) => {
+    set(state => ({
+      mode: 'match',
+      difficulty: difficulty ?? state.difficulty,
+      isPlaying: false,
+    }));
   },
 
   // ゲームリセット
