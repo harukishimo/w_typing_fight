@@ -2,7 +2,7 @@
  * ゲーム関連の型定義
  */
 
-export type Difficulty = 'EASY' | 'NORMAL' | 'HARD';
+export type Difficulty = 'EASY' | 'NORMAL' | 'HARD' | 'SCORE';
 
 export interface DifficultyConfig {
   difficulty: Difficulty;

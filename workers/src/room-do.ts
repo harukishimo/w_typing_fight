@@ -10,7 +10,8 @@ import type {
   ServerMessage,
   Word,
 } from 'shared';
-import { GAME_CONSTANTS, calculateDamage, getRandomWord } from 'shared';
+import { GAME_CONSTANTS, calculateDamage } from 'shared';
+import { fetchRandomWord } from './services/wordService';
 
 type JoinClientMessage = Extract<ClientMessage, { type: 'join' }>;
 
@@ -326,7 +327,7 @@ export class RoomDO {
     attacker.combo += 1;
 
     // 次のお題を取得
-    const nextWord = this.assignNextWord(attackerId);
+    const nextWord = await this.assignNextWord(attackerId);
     if (!nextWord) {
       this.sendError(websocket, 'Failed to assign next word');
       return;
@@ -429,7 +430,7 @@ export class RoomDO {
 
     const words: Record<string, Word> = {};
     for (const [playerId] of this.roomState.players) {
-      const word = this.assignNextWord(playerId);
+      const word = await this.assignNextWord(playerId);
       if (word) {
         words[playerId] = word;
       }
@@ -563,11 +564,11 @@ export class RoomDO {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  private assignNextWord(playerId: string): Word | null {
+  private async assignNextWord(playerId: string): Promise<Word | null> {
     const player = this.roomState.players.get(playerId);
     if (!player) return null;
 
-    const word = getRandomWord(player.difficulty);
+    const word = await fetchRandomWord(this.env, player.difficulty);
     player.currentWord = word;
     return word;
   }

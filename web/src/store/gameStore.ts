@@ -4,9 +4,10 @@
 
 import { create } from 'zustand';
 import type { Difficulty, Word, PlayerState } from 'shared';
-import { calculateDamage, GAME_CONSTANTS, getRandomWord } from 'shared';
+import { calculateDamage, GAME_CONSTANTS } from 'shared';
 import { RomajiMatcher } from '@/utils/romajiMatcher';
 import { hiraganaToDefaultRomaji } from '@/utils/romajiPatterns';
+import { fetchRandomWord } from '@/services/wordService';
 
 type GameMode = 'solo' | 'match';
 
@@ -46,7 +47,7 @@ interface GameState {
 
   // アクション
   setDifficulty: (difficulty: Difficulty) => void;
-  startGame: () => void;
+  startGame: () => Promise<void>;
   startMatchGame: (params: {
     difficulty: Difficulty;
     word: Word;
@@ -55,7 +56,7 @@ interface GameState {
   }) => void;
   handleKeyPress: (key: string) => void;
   resetGame: () => void;
-  nextWord: () => void;
+  nextWord: () => Promise<void>;
   setMatchWord: (word: Word) => void;
   endMatchGame: () => void;
   pauseMatchRound: () => void;
@@ -89,31 +90,35 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   // ゲーム開始
-  startGame: () => {
+  startGame: async () => {
     const { difficulty } = get();
     if (!difficulty) return;
 
-    const word = getRandomWord(difficulty);
-    const matcher = new RomajiMatcher(word.reading);
+    try {
+      const word = await fetchRandomWord(difficulty);
+      const matcher = new RomajiMatcher(word.reading);
 
-    set({
-      currentWord: word,
-      expectedRomaji: hiraganaToDefaultRomaji(word.reading),
-      romajiMatcher: matcher,
-      hp: GAME_CONSTANTS.INITIAL_HP,
-      lives: GAME_CONSTANTS.INITIAL_LIVES,
-      combo: 0,
-      missCount: 0,
-      totalAttacks: 0,
-      currentInput: '',
-      currentCharIndex: 0,
-      currentWordMisses: 0,
-      isPlaying: true,
-      startTime: Date.now(),
-      mode: 'solo',
-      onWordComplete: null,
-      onMiss: null,
-    });
+      set({
+        currentWord: word,
+        expectedRomaji: hiraganaToDefaultRomaji(word.reading),
+        romajiMatcher: matcher,
+        hp: GAME_CONSTANTS.INITIAL_HP,
+        lives: GAME_CONSTANTS.INITIAL_LIVES,
+        combo: 0,
+        missCount: 0,
+        totalAttacks: 0,
+        currentInput: '',
+        currentCharIndex: 0,
+        currentWordMisses: 0,
+        isPlaying: true,
+        startTime: Date.now(),
+        mode: 'solo',
+        onWordComplete: null,
+        onMiss: null,
+      });
+    } catch (error) {
+      console.error('[gameStore] Failed to start game', error);
+    }
   },
 
   // マッチ戦開始
@@ -222,21 +227,25 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   // 次のお題へ
-  nextWord: () => {
+  nextWord: async () => {
     const { difficulty } = get();
     if (!difficulty) return;
 
-    const word = getRandomWord(difficulty);
-    const matcher = new RomajiMatcher(word.reading);
+    try {
+      const word = await fetchRandomWord(difficulty);
+      const matcher = new RomajiMatcher(word.reading);
 
-    set({
-      currentWord: word,
-      expectedRomaji: hiraganaToDefaultRomaji(word.reading),
-      romajiMatcher: matcher,
-      currentInput: '',
-      currentCharIndex: 0,
-      startTime: Date.now(),
-    });
+      set({
+        currentWord: word,
+        expectedRomaji: hiraganaToDefaultRomaji(word.reading),
+        romajiMatcher: matcher,
+        currentInput: '',
+        currentCharIndex: 0,
+        startTime: Date.now(),
+      });
+    } catch (error) {
+      console.error('[gameStore] Failed to load next word', error);
+    }
   },
 
   setMatchWord: (word) => {

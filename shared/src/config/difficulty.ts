@@ -21,6 +21,14 @@ export const DIFFICULTY_CONFIG: Record<Difficulty, DifficultyConfig> = {
     expectedTime: 10,
     theoreticalDPS: 1.5,
   },
+  SCORE: {
+    difficulty: 'SCORE',
+    charRange: [14, 24],
+    baseDamage: 16,
+    maxCombo: 6,
+    expectedTime: 12,
+    theoreticalDPS: 1.7,
+  },
   HARD: {
     difficulty: 'HARD',
     charRange: [18, 30],

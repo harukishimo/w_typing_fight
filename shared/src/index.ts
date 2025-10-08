@@ -5,6 +5,7 @@
 // Types
 export type * from './types/game';
 export type * from './types/messages';
+export type * from './types/db';
 
 // Config
 export { DIFFICULTY_CONFIG, calculateDamage, getComboMultiplier } from './config/difficulty';
