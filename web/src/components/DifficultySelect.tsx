@@ -11,6 +11,8 @@ type Props = {
   onBack?: () => void;
 };
 
+type SelectableDifficulty = Exclude<Difficulty, 'SCORE'>;
+
 export function DifficultySelect({ onBack }: Props) {
   const { setDifficulty, startGame } = useGameStore();
 
@@ -19,9 +21,17 @@ export function DifficultySelect({ onBack }: Props) {
     startGame();
   };
 
-  const difficulties: Difficulty[] = ['EASY', 'NORMAL', 'HARD'];
+  const difficulties: SelectableDifficulty[] = ['EASY', 'NORMAL', 'HARD'];
 
-  const difficultyInfo = {
+  const difficultyInfo: Record<SelectableDifficulty, {
+    emoji: string;
+    title: string;
+    subtitle: string;
+    description: string;
+    details: string;
+    color: string;
+    hoverColor: string;
+  }> = {
     EASY: {
       emoji: '🟢',
       title: 'EASY',

@@ -30,7 +30,7 @@ async function loadPrompts(difficulty: Difficulty): Promise<Word[] | null> {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('typing_prompts')
-      .select('id,text,reading,romaji,difficulty,char_count,category')
+      .select('id,text,reading,romaji,difficulty,char_count,category,created_at')
       .eq('difficulty', difficulty);
 
     if (error) {

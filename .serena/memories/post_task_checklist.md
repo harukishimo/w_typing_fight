@@ -1,0 +1,1 @@
+Before wrap-up run targeted scripts: `pnpm type-check` for workspace TS validation, `pnpm lint` if linting is relevant, and `pnpm build` to ensure both frontend and Workers build. For frontend-only changes prefer `pnpm --filter web build`; for Worker logic run `pnpm --filter workers type-check`. Mention any skipped validations when unable to run them.
