@@ -19,6 +19,8 @@ export class RoomDO {
   private env: Env;
   private sessions: Map<string, WebSocket> = new Map();
   private playerAuth: Map<string, PlayerAuthContext> = new Map();
+  private readonly heartbeatIntervalMs = 30_000;
+  private heartbeatScheduled = false;
   private roomState: RoomState = {
     roomId: '',
     players: new Map(),
@@ -34,6 +36,31 @@ export class RoomDO {
 
     // ルームIDを初期化（Durable Objectの名前があればそれを利用）
     this.roomState.roomId = state.id.name ?? state.id.toString();
+
+    // Hibernation APIで管理されているWebSocketを復元
+    const hibernatedSockets = this.state.getWebSockets();
+    for (const ws of hibernatedSockets) {
+      const playerId = this.getPlayerId(ws);
+      if (playerId) {
+        this.sessions.set(playerId, ws);
+      }
+    }
+
+    // プレイヤー状態をStorageから復元（非同期操作を避けるため遅延ロード）
+    this.state.blockConcurrencyWhile(async () => {
+      const storedPlayers = await this.state.storage.get<Map<string, PlayerState>>('players');
+      if (storedPlayers) {
+        this.roomState.players = new Map(storedPlayers);
+      }
+    });
+
+    console.log('[RoomDO] Constructor called', {
+      roomId: this.roomState.roomId,
+      doId: state.id.toString(),
+      existingPlayers: this.roomState.players.size,
+      existingSessions: this.sessions.size,
+      hibernatedSockets: hibernatedSockets.length,
+    });
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -64,9 +91,10 @@ export class RoomDO {
   async handleSession(websocket: WebSocket): Promise<void> {
     console.log('[RoomDO] handleSession start');
 
+    // WebSocket Hibernation APIを使用してDurable Objectが管理
     this.state.acceptWebSocket(websocket);
 
-    console.log('[RoomDO] WebSocket accepted');
+    console.log('[RoomDO] WebSocket accepted by Durable Object state');
   }
 
   async webSocketMessage(
@@ -197,7 +225,11 @@ export class RoomDO {
     this.attachSession(websocket, playerId);
     this.roomState.players.set(playerId, playerState);
 
+    // プレイヤー状態を永続化
+    await this.state.storage.put('players', this.roomState.players);
+
     console.log('[RoomDO] Player joined:', playerState);
+    console.log('[RoomDO] Active sessions after join:', this.sessions.size);
 
     // 参加成功を通知
     this.send(websocket, {
@@ -545,6 +577,7 @@ export class RoomDO {
    */
   private broadcastPlayerUpdate(): void {
     const players = Array.from(this.roomState.players.values());
+    console.log('[RoomDO] Broadcasting player update', players.length);
     this.broadcast({
       type: 'playerUpdate',
       players,
@@ -556,9 +589,16 @@ export class RoomDO {
    */
   private send(websocket: WebSocket, message: ServerMessage): void {
     try {
-      websocket.send(JSON.stringify(message));
+      if (websocket.readyState === WebSocket.OPEN) {
+        websocket.send(JSON.stringify(message));
+      } else {
+        console.warn('[RoomDO] Cannot send to non-open WebSocket', {
+          readyState: websocket.readyState,
+          messageType: message.type,
+        });
+      }
     } catch (error) {
-      console.error('Send error:', error);
+      console.error('[RoomDO] Send error:', error);
     }
   }
 
@@ -578,26 +618,68 @@ export class RoomDO {
       this.roomState.players.delete(playerId);
       this.sessions.delete(playerId);
       this.playerAuth.delete(playerId);
+
+      // プレイヤー状態の変更を永続化
+      this.state.storage.put('players', this.roomState.players);
+
       this.broadcast({ type: 'playerLeft', playerId });
+      console.log('[RoomDO] Session closed', {
+        playerId,
+        remainingSessions: this.sessions.size,
+      });
+    }
+
+    if (this.sessions.size === 0) {
+      this.heartbeatScheduled = false;
+
+      // 全員退室したらルーム状態をリセット（再利用可能に）
+      console.log('[RoomDO] All players left, resetting room state');
+      this.resetRoom();
     }
   }
 
   broadcast(message: ServerMessage): void {
     const payload = JSON.stringify(message);
-    this.sessions.forEach((ws) => {
+    this.sessions.forEach((ws, playerId) => {
       try {
-        ws.send(payload);
+        // WebSocketの接続状態を確認してから送信
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(payload);
+        } else {
+          console.warn('[RoomDO] Skipping broadcast to closed WebSocket', {
+            playerId,
+            readyState: ws.readyState,
+          });
+        }
       } catch (error) {
-        console.error('Broadcast error:', error);
+        console.error('[RoomDO] Broadcast error:', error, { playerId });
       }
     });
   }
 
   private attachSession(websocket: WebSocket, playerId: string): void {
+    // WebSocketのメタデータとして playerIdを保存（Durable Object管理下で永続化）
     if (typeof websocket.serializeAttachment === 'function') {
       websocket.serializeAttachment({ playerId });
     }
+
+    // セッションMapに追加（インスタンス変数として一時管理）
     this.sessions.set(playerId, websocket);
+    console.log('[RoomDO] Attached session', {
+      playerId,
+      totalSessions: this.sessions.size,
+    });
+
+    this.ensureHeartbeat();
+  }
+
+  private ensureHeartbeat(): void {
+    if (this.sessions.size === 0 || this.heartbeatScheduled) {
+      return;
+    }
+
+    this.heartbeatScheduled = true;
+    this.state.storage.setAlarm(Date.now() + this.heartbeatIntervalMs);
   }
 
   private getPlayerId(websocket: WebSocket): string | null {
@@ -618,6 +700,33 @@ export class RoomDO {
     }
 
     return null;
+  }
+
+  async alarm(): Promise<void> {
+    this.heartbeatScheduled = false;
+
+    if (this.sessions.size === 0) {
+      return;
+    }
+
+    this.broadcast({ type: 'pong' });
+    this.ensureHeartbeat();
+  }
+
+  /**
+   * ルーム状態をリセット（再利用可能にする）
+   */
+  private resetRoom(): void {
+    // ルーム状態を初期化
+    this.roomState.players.clear();
+    this.roomState.currentRound = 1;
+    this.roomState.status = 'waiting';
+    this.roomState.winner = null;
+
+    // Storageもクリア
+    this.state.storage.delete('players');
+
+    console.log('[RoomDO] Room state reset, ready for new game');
   }
 
   private async registerPlayerAuth(

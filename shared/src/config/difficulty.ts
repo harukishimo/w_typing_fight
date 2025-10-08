@@ -8,10 +8,10 @@ export const DIFFICULTY_CONFIG: Record<Difficulty, DifficultyConfig> = {
   EASY: {
     difficulty: 'EASY',
     charRange: [5, 10],
-    baseDamage: 7,
+    baseDamage: 5,
     maxCombo: 3,
     expectedTime: 5,
-    theoreticalDPS: 1.4,
+    theoreticalDPS: 1.0,
   },
   NORMAL: {
     difficulty: 'NORMAL',
@@ -24,10 +24,10 @@ export const DIFFICULTY_CONFIG: Record<Difficulty, DifficultyConfig> = {
   HARD: {
     difficulty: 'HARD',
     charRange: [18, 30],
-    baseDamage: 18,
+    baseDamage: 20,
     maxCombo: 7,
     expectedTime: 15,
-    theoreticalDPS: 1.67,
+    theoreticalDPS: 1.85,
   },
 };
 

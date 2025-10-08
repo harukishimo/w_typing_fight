@@ -28,7 +28,7 @@ export default {
       // Get Durable Object instance
       const id = roomNamespace.idFromName(roomId);
       const stub = roomNamespace.get(id);
-      console.log('[Worker] Forwarding websocket to RoomDO', roomId);
+      console.log('[Worker] Forwarding websocket to RoomDO', roomId, 'DO ID:', id.toString());
 
       return stub.fetch(request);
     }
