@@ -1,17 +1,19 @@
-import { useEffect, useState, type JSX } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { DifficultySelect } from '@/components/DifficultySelect';
 import { TypingGame } from '@/components/TypingGame';
 import { ModeSelect } from '@/components/ModeSelect';
 import { MatchView } from '@/components/MatchView';
 import { AuthBar } from '@/components/AuthBar';
+import { ScoreAttackGame } from '@/components/ScoreAttackGame';
 import { useGameStore } from '@/store/gameStore';
 import { useMatchStore } from '@/store/matchStore';
 
-type Mode = 'none' | 'solo' | 'match';
+type Mode = 'none' | 'solo' | 'match' | 'score';
 
 function getModeFromPath(pathname: string): Mode {
   if (pathname.startsWith('/solo')) return 'solo';
   if (pathname.startsWith('/match') || pathname.startsWith('/room/')) return 'match';
+  if (pathname.startsWith('/score')) return 'score';
   return 'none';
 }
 
@@ -45,6 +47,13 @@ function App() {
     setMode('match');
   };
 
+  const handleSelectScoreAttack = () => {
+    resetGame();
+    leaveRoom();
+    window.history.pushState(null, '', '/score');
+    setMode('score');
+  };
+
   const handleExitSolo = () => {
     resetGame();
     window.history.pushState(null, '', '/');
@@ -69,7 +78,7 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  let content: JSX.Element;
+  let content: ReactElement;
 
   if (mode === 'solo') {
     content = (
@@ -79,8 +88,16 @@ function App() {
     );
   } else if (mode === 'match') {
     content = <MatchView onBack={handleBackToMode} initialRoomId={initialRoomId ?? undefined} />;
+  } else if (mode === 'score') {
+    content = <ScoreAttackGame onBack={handleBackToMode} />;
   } else {
-    content = <ModeSelect onSelectSolo={handleSelectSolo} onSelectMatch={handleSelectMatch} />;
+    content = (
+      <ModeSelect
+        onSelectSolo={handleSelectSolo}
+        onSelectMatch={handleSelectMatch}
+        onSelectScoreAttack={handleSelectScoreAttack}
+      />
+    );
   }
 
   return (

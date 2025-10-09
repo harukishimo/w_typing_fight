@@ -14,4 +14,4 @@ export { DIFFICULTY_CONFIG, calculateDamage, getComboMultiplier } from './config
 export { MOCK_WORDS, getRandomWord, getRandomWords } from './data/mockWords';
 
 // Constants
-export { GAME_CONSTANTS } from './constants/game';
+export { GAME_CONSTANTS, SCORE_ATTACK_CONSTANTS } from './constants/game';

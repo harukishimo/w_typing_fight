@@ -59,3 +59,20 @@ export interface MatchResult {
   roundsPlayed: number;
   createdAt: string;
 }
+
+export interface ScoreAttackSummary {
+  score: number;
+  totalWords: number;
+  totalMisses: number;
+  maxNoMissCount: number;
+  durationMs: number;
+  startedAt: string;
+  finishedAt: string;
+}
+
+export interface ScoreAttackHighScore {
+  userId: string;
+  displayName: string;
+  bestScore: number;
+  updatedAt: string;
+}

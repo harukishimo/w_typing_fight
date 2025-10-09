@@ -1,13 +1,15 @@
 import { motion } from 'framer-motion';
 import { DIFFICULTY_CONFIG } from 'shared';
 import { LeaderboardPanel } from './LeaderboardPanel';
+import { ScoreAttackLeaderboard } from './ScoreAttackLeaderboard';
 
 type Props = {
   onSelectSolo: () => void;
   onSelectMatch: () => void;
+  onSelectScoreAttack: () => void;
 };
 
-export function ModeSelect({ onSelectSolo, onSelectMatch }: Props) {
+export function ModeSelect({ onSelectSolo, onSelectMatch, onSelectScoreAttack }: Props) {
   const strategyCards = [
     {
       key: 'EASY',
@@ -54,7 +56,7 @@ export function ModeSelect({ onSelectSolo, onSelectMatch }: Props) {
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-3 gap-6">
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -65,6 +67,19 @@ export function ModeSelect({ onSelectSolo, onSelectMatch }: Props) {
             <h2 className="text-3xl font-bold mb-2">ソロ練習</h2>
             <p className="text-sm text-primary-500">
               難易度を選んで一人でスコアを伸ばそう。
+            </p>
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={onSelectScoreAttack}
+            className="bg-gradient-to-br from-amber-300 to-amber-500 text-white rounded-2xl p-10 shadow-xl transition"
+          >
+            <div className="text-6xl mb-4">⏱️</div>
+            <h2 className="text-3xl font-bold mb-2">スコアアタック</h2>
+            <p className="text-sm text-white/80">
+              60秒間で高スコアを狙い、ランキングに名を刻もう。
             </p>
           </motion.button>
 
@@ -82,8 +97,10 @@ export function ModeSelect({ onSelectSolo, onSelectMatch }: Props) {
           </motion.button>
         </div>
 
-
-        <LeaderboardPanel />
+        <div className="grid md:grid-cols-2 gap-6">
+          <ScoreAttackLeaderboard />
+          <LeaderboardPanel />
+        </div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
