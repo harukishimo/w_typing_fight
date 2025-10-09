@@ -87,6 +87,11 @@ end $$;
 
 comment on table public.score_attack_high_scores is 'Tracks the best score attack result per user.';
 
+grant usage on schema public to authenticated;
+grant select on public.score_attack_high_scores to authenticated;
+grant insert, update on public.score_attack_high_scores to authenticated;
+grant select on public.score_attack_high_scores to anon;
+
 create or replace view public.v_score_attack_high_scores as
   select
     user_id,
@@ -97,3 +102,6 @@ create or replace view public.v_score_attack_high_scores as
   order by best_score desc, updated_at asc;
 
 comment on view public.v_score_attack_high_scores is 'Ordered view for score attack high score leaderboard.';
+
+grant select on public.v_score_attack_high_scores to authenticated;
+grant select on public.v_score_attack_high_scores to anon;
