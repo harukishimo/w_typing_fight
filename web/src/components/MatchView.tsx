@@ -32,6 +32,7 @@ export function MatchView({ onBack, initialRoomId }: Props) {
   const [playerName, setPlayerName] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty>('EASY');
   const [hasEditedName, setHasEditedName] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
 
   const {
     status,
@@ -63,16 +64,23 @@ export function MatchView({ onBack, initialRoomId }: Props) {
   const profileFallbackName = useProfileStore(state => state.fallbackName);
 
   useEffect(() => {
-    return () => {
-      leaveRoom();
-    };
-  }, [leaveRoom]);
-
-  useEffect(() => {
     if (initialRoomId) {
       setRoomId(initialRoomId);
     }
   }, [initialRoomId]);
+
+  useEffect(() => {
+    if (isJoining && (status === 'waiting' || status === 'ready' || status === 'playing' || status === 'countdown')) {
+      setIsJoining(false);
+    }
+  }, [status, isJoining]);
+
+  useEffect(() => {
+    return () => {
+      leaveRoom();
+      setIsJoining(false);
+    };
+  }, [leaveRoom]);
 
   useEffect(() => {
     const currentUserId = user?.id ?? null;
@@ -117,11 +125,15 @@ export function MatchView({ onBack, initialRoomId }: Props) {
 
   const handleJoin = () => {
     clearError();
+    if (isJoining || status === 'connecting') {
+      return;
+    }
     const trimmedName = playerName.trim();
     const trimmedRoomId = roomId.trim();
     if (!trimmedName || !trimmedRoomId) {
       return;
     }
+    setIsJoining(true);
     joinRoom({ roomId: trimmedRoomId, playerName: trimmedName, difficulty });
   };
 
@@ -378,14 +390,18 @@ export function MatchView({ onBack, initialRoomId }: Props) {
               <button
                 type="button"
                 onClick={handleJoin}
-                disabled={!playerName.trim() || !roomId.trim() || status === 'connecting'}
+                disabled={!playerName.trim() || !roomId.trim() || status === 'connecting' || isJoining || isConnected}
                 className={`w-full py-3 rounded-xl font-bold text-lg shadow transition ${
-                  status === 'connecting'
+                  status === 'connecting' || isJoining || isConnected
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : 'bg-gradient-to-r from-primary-400 to-primary-600 text-white hover:shadow-lg'
                 }`}
               >
-                {status === 'connecting' ? '接続中...' : '入室 / ルーム作成'}
+                {status === 'connecting' || isJoining
+                  ? '接続中...'
+                  : isConnected
+                    ? '入室済み'
+                    : '入室 / ルーム作成'}
               </button>
             </div>
 
