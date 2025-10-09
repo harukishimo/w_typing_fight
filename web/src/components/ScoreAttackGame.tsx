@@ -167,28 +167,6 @@ export function ScoreAttackGame({ onBack }: Props) {
   return (
     <div className="relative min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-primary-50 to-primary-100 overflow-hidden">
       <Countdown count={countdown} />
-      <AnimatePresence>
-        {isTimeBonusVisible && (
-          <>
-            <motion.div
-              key="bonus-flare-left"
-              className="pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-amber-400/60 via-amber-200/40 to-transparent blur-sm"
-              initial={{ opacity: 0, x: -40 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -40 }}
-              transition={{ duration: 0.3 }}
-            />
-            <motion.div
-              key="bonus-flare-right"
-              className="pointer-events-none absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-amber-400/60 via-amber-200/40 to-transparent blur-sm"
-              initial={{ opacity: 0, x: 40 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 40 }}
-              transition={{ duration: 0.3 }}
-            />
-          </>
-        )}
-      </AnimatePresence>
 
       <div className="relative w-full max-w-5xl space-y-6">
         <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -234,14 +212,34 @@ export function ScoreAttackGame({ onBack }: Props) {
             <div className="grid md:grid-cols-[2fr_1fr] gap-6">
               <div className="space-y-4">
                 <div className="text-sm text-primary-400">お題</div>
-                <div className="rounded-2xl border border-primary-100 bg-primary-50/70 px-6 py-8 text-center shadow-inner">
-                  {isLoadingWord || !currentWord ? (
-                    <span className="text-primary-300 text-sm">お題を読み込んでいます...</span>
-                  ) : (
-                    <span className="text-5xl font-bold text-primary-800 leading-tight break-words">
-                      {currentWord.text}
-                    </span>
-                  )}
+                <div className="relative">
+                  <AnimatePresence>
+                    {isTimeBonusVisible && (
+                      <motion.div
+                        key="bonus-ring"
+                        className="pointer-events-none absolute -inset-4 rounded-[36px]"
+                        initial={{ opacity: 0, rotate: 0, scale: 0.95 }}
+                        animate={{ opacity: [0, 1, 0.6, 0], rotate: 360, scale: [0.95, 1.02, 1.08] }}
+                        exit={{ opacity: 0, scale: 1.1 }}
+                        transition={{ duration: 0.9, ease: 'easeInOut' }}
+                        style={{
+                          background:
+                            'conic-gradient(from 0deg, rgba(251,191,36,0.05), rgba(251,191,36,0.7), rgba(251,191,36,0.05))',
+                        }}
+                      >
+                        <div className="absolute inset-[3px] rounded-[32px] border-2 border-amber-300/60 shadow-[0_0_25px_rgba(251,191,36,0.45)]" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  <div className="relative rounded-2xl border border-primary-100 bg-primary-50/70 px-6 py-8 text-center shadow-inner">
+                    {isLoadingWord || !currentWord ? (
+                      <span className="text-primary-300 text-sm">お題を読み込んでいます...</span>
+                    ) : (
+                      <span className="text-5xl font-bold text-primary-800 leading-tight break-words">
+                        {currentWord.text}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-2">
